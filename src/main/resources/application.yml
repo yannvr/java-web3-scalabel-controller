@@ -1,0 +1,70 @@
+spring:
+  application:
+    name: demo
+  profiles:
+    active: dev
+  servlet:
+    encoding:
+      charset: UTF-8
+      enabled: true
+      force: true
+  jpa:
+    properties:
+      hibernate:
+        format_sql: true
+        jdbc:
+          lob:
+            non_contextual_creation: true
+  security:
+    filter:
+      order: 10
+  cache:
+    type: caffeine
+    cache-names: ethereum-cache,transaction-cache
+    caffeine:
+      spec: maximumSize=500,expireAfterWrite=600s
+  rabbitmq:
+    listener:
+      simple:
+        acknowledge-mode: manual
+        default-requeue-rejected: false
+        missing-queues-fatal: false
+
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+logging:
+  level:
+    com.example.demo: DEBUG
+    org.web3j: INFO
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+    file: "%d{yyyy-MM-dd HH:mm:ss} [%thread] %-5level %logger{36} - %msg%n"
+  file:
+    name: logs/application.log
+
+springdoc:
+  api-docs:
+    enabled: true
+    path: /api-docs
+  swagger-ui:
+    enabled: true
+    path: /swagger-ui.html
+    operationsSorter: method
+    tagsSorter: alpha
+    tryItOutEnabled: true
+    disable-swagger-default-url: true
+
+ethereum:
+  node-url: https://mainnet.infura.io/v3/your-project-id
+  http-timeout: 10000
+  max-retries: 3
+  retry-delay: 1000
+
+jwt:
+  secret: 404E635266556A586E3272357538782F413F4428472B4B6250645367566B5970
+  expiration: 86400000
+  header: Authorization
+  prefix: Bearer

@@ -10,7 +10,8 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.web3j.protocol.Web3j;
-import org.web3j.protocol.core.DefaultBlockParameterName;
+import org.web3j.protocol.core.DefaultBlockParameter;
+import org.web3j.protocol.core.methods.request.Transaction;
 import org.web3j.protocol.core.methods.response.*;
 import org.web3j.tx.Transfer;
 import org.web3j.utils.Convert;
@@ -42,13 +43,11 @@ public class Web3jService implements IWeb3jService {
     )
     public BigDecimal getEthBalance(String address) {
         try {
-            BigInteger balanceWei = web3j.ethGetBalance(address, DefaultBlockParameterName.LATEST)
-                .send()
-                .getBalance();
-            return Convert.fromWei(balanceWei.toString(), Convert.Unit.ETHER);
+            EthGetBalance balance = web3j.ethGetBalance(address, DefaultBlockParameterName.LATEST).send();
+            return Convert.fromWei(balance.getBalance().toString(), Convert.Unit.ETHER);
         } catch (Exception e) {
-            log.error("Error fetching ETH balance for address: {}", address, e);
-            throw new Web3jException("Failed to fetch ETH balance", e);
+            log.error("Failed to get ETH balance for address: {}", address, e);
+            throw new RuntimeException("Failed to get ETH balance", e);
         }
     }
 
@@ -67,12 +66,11 @@ public class Web3jService implements IWeb3jService {
     )
     public BigInteger getTransactionCount(String address) {
         try {
-            return web3j.ethGetTransactionCount(address, DefaultBlockParameterName.LATEST)
-                .send()
-                .getTransactionCount();
+            EthGetTransactionCount count = web3j.ethGetTransactionCount(address, DefaultBlockParameterName.LATEST).send();
+            return count.getTransactionCount();
         } catch (Exception e) {
-            log.error("Error fetching transaction count for address: {}", address, e);
-            throw new Web3jException("Failed to fetch transaction count", e);
+            log.error("Failed to get transaction count for address: {}", address, e);
+            throw new RuntimeException("Failed to get transaction count", e);
         }
     }
 
@@ -85,12 +83,11 @@ public class Web3jService implements IWeb3jService {
     )
     public BigInteger getGasPrice() {
         try {
-            return web3j.ethGasPrice()
-                .send()
-                .getGasPrice();
+            EthGasPrice gasPrice = web3j.ethGasPrice().send();
+            return gasPrice.getGasPrice();
         } catch (Exception e) {
-            log.error("Error fetching gas price", e);
-            throw new Web3jException("Failed to fetch gas price", e);
+            log.error("Failed to get gas price", e);
+            throw new RuntimeException("Failed to get gas price", e);
         }
     }
 
@@ -103,12 +100,11 @@ public class Web3jService implements IWeb3jService {
     )
     public BigInteger getLatestBlockNumber() {
         try {
-            return web3j.ethBlockNumber()
-                .send()
-                .getBlockNumber();
+            EthBlockNumber blockNumber = web3j.ethBlockNumber().send();
+            return blockNumber.getBlockNumber();
         } catch (Exception e) {
-            log.error("Error fetching latest block number", e);
-            throw new Web3jException("Failed to fetch latest block number", e);
+            log.error("Failed to get latest block number", e);
+            throw new RuntimeException("Failed to get latest block number", e);
         }
     }
 
@@ -121,12 +117,11 @@ public class Web3jService implements IWeb3jService {
     )
     public EthBlock.Block getBlockByNumber(BigInteger blockNumber) {
         try {
-            return web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(blockNumber), true)
-                .send()
-                .getBlock();
+            EthBlock block = web3j.ethGetBlockByNumber(DefaultBlockParameter.valueOf(blockNumber), true).send();
+            return block.getBlock();
         } catch (Exception e) {
-            log.error("Error fetching block by number: {}", blockNumber, e);
-            throw new Web3jException("Failed to fetch block", e);
+            log.error("Failed to get block by number: {}", blockNumber, e);
+            throw new RuntimeException("Failed to get block by number", e);
         }
     }
 
@@ -139,13 +134,11 @@ public class Web3jService implements IWeb3jService {
     )
     public TransactionReceipt getTransactionReceipt(String transactionHash) {
         try {
-            return web3j.ethGetTransactionReceipt(transactionHash)
-                .send()
-                .getTransactionReceipt()
-                .orElseThrow(() -> new Web3jException("Transaction receipt not found"));
+            EthGetTransactionReceipt receipt = web3j.ethGetTransactionReceipt(transactionHash).send();
+            return receipt.getTransactionReceipt().orElse(null);
         } catch (Exception e) {
-            log.error("Error fetching transaction receipt for hash: {}", transactionHash, e);
-            throw new Web3jException("Failed to fetch transaction receipt", e);
+            log.error("Failed to get transaction receipt for hash: {}", transactionHash, e);
+            throw new RuntimeException("Failed to get transaction receipt", e);
         }
     }
 
@@ -158,13 +151,10 @@ public class Web3jService implements IWeb3jService {
     )
     public Transaction getTransactionByHash(String transactionHash) {
         try {
-            return web3j.ethGetTransactionByHash(transactionHash)
-                .send()
-                .getTransaction()
-                .orElseThrow(() -> new Web3jException("Transaction not found"));
+            return web3j.ethGetTransactionByHash(transactionHash).send();
         } catch (Exception e) {
-            log.error("Error fetching transaction for hash: {}", transactionHash, e);
-            throw new Web3jException("Failed to fetch transaction", e);
+            log.error("Failed to get transaction by hash: {}", transactionHash, e);
+            throw new RuntimeException("Failed to get transaction by hash", e);
         }
     }
 
@@ -211,9 +201,8 @@ public class Web3jService implements IWeb3jService {
                 Convert.toWei(amount, Convert.Unit.ETHER).toBigInteger()
             );
 
-            return web3j.ethEstimateGas(transaction)
-                .send()
-                .getAmountUsed();
+            EthEstimateGas gas = web3j.ethEstimateGas(transaction).send();
+            return gas.getAmountUsed();
         } catch (Exception e) {
             log.error("Error estimating gas for transaction from {} to {}", from, to, e);
             throw new Web3jException("Failed to estimate gas", e);
@@ -229,12 +218,11 @@ public class Web3jService implements IWeb3jService {
     )
     public boolean isNodeSyncing() {
         try {
-            return web3j.ethSyncing()
-                .send()
-                .isSyncing();
+            EthSyncing syncing = web3j.ethSyncing().send();
+            return syncing.isSyncing();
         } catch (Exception e) {
-            log.error("Error checking node sync status", e);
-            throw new Web3jException("Failed to check node sync status", e);
+            log.error("Failed to check node syncing status", e);
+            throw new RuntimeException("Failed to check node syncing status", e);
         }
     }
 
@@ -247,12 +235,11 @@ public class Web3jService implements IWeb3jService {
     )
     public String getNetworkId() {
         try {
-            return web3j.netVersion()
-                .send()
-                .getNetVersion();
+            EthChainId chainId = web3j.ethChainId().send();
+            return chainId.getChainId().toString();
         } catch (Exception e) {
-            log.error("Error fetching network ID", e);
-            throw new Web3jException("Failed to fetch network ID", e);
+            log.error("Failed to get network ID", e);
+            throw new RuntimeException("Failed to get network ID", e);
         }
     }
 }

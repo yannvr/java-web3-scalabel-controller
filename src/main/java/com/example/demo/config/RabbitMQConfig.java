@@ -28,6 +28,10 @@ public class RabbitMQConfig {
     public static final String WALLET_EXCHANGE = "wallet.exchange";
     public static final String WALLET_ROUTING_KEY = "wallet.operation";
 
+    public static final String WEB3_QUEUE = "web3.operations";
+    public static final String WEB3_EXCHANGE = "web3.exchange";
+    public static final String WEB3_ROUTING_KEY = "web3.operation";
+
     @Bean
     public ConnectionFactory connectionFactory() {
         CachingConnectionFactory connectionFactory = new CachingConnectionFactory();
@@ -74,5 +78,26 @@ public class RabbitMQConfig {
                 .bind(walletQueue)
                 .to(walletExchange)
                 .with(WALLET_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue web3Queue() {
+        return QueueBuilder.durable(WEB3_QUEUE)
+                .withArgument("x-max-length", 100000)
+                .withArgument("x-overflow", "reject-publish")
+                .build();
+    }
+
+    @Bean
+    public DirectExchange web3Exchange() {
+        return new DirectExchange(WEB3_EXCHANGE);
+    }
+
+    @Bean
+    public Binding web3Binding(Queue web3Queue, DirectExchange web3Exchange) {
+        return BindingBuilder
+                .bind(web3Queue)
+                .to(web3Exchange)
+                .with(WEB3_ROUTING_KEY);
     }
 }

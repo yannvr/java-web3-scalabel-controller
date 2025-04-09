@@ -2,7 +2,6 @@ package com.example.demo.controller;
 
 import com.example.demo.dto.Web3Operation;
 import com.example.demo.dto.Web3Response;
-import com.example.demo.service.IWeb3jService;
 import com.example.demo.service.Web3MessageProducer;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -24,7 +23,6 @@ import java.util.concurrent.CompletableFuture;
 public class Web3jController {
 
     private final Web3MessageProducer messageProducer;
-    private final IWeb3jService web3jService;
 
     @Operation(summary = "Get ETH balance")
     @GetMapping("/balance/{address}")

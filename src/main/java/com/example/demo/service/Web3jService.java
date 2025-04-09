@@ -11,13 +11,25 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameter;
+import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.request.Transaction;
-import org.web3j.protocol.core.methods.response.*;
+import org.web3j.protocol.core.methods.response.EthBlock;
+import org.web3j.protocol.core.methods.response.EthBlockNumber;
+import org.web3j.protocol.core.methods.response.EthChainId;
+import org.web3j.protocol.core.methods.response.EthEstimateGas;
+import org.web3j.protocol.core.methods.response.EthGasPrice;
+import org.web3j.protocol.core.methods.response.EthGetBalance;
+import org.web3j.protocol.core.methods.response.EthGetTransactionCount;
+import org.web3j.protocol.core.methods.response.EthGetTransactionReceipt;
+import org.web3j.protocol.core.methods.response.EthSyncing;
+import org.web3j.protocol.core.methods.response.EthTransaction;
+import org.web3j.protocol.core.methods.response.TransactionReceipt;
 import org.web3j.tx.Transfer;
 import org.web3j.utils.Convert;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
@@ -75,7 +87,7 @@ public class Web3jService implements IWeb3jService {
     }
 
     @Override
-    @Cacheable(value = "gasPrice", ttl = 60)
+    @Cacheable(value = "gasPrice")
     @Retryable(
         value = {Exception.class},
         maxAttempts = 3,
@@ -92,7 +104,7 @@ public class Web3jService implements IWeb3jService {
     }
 
     @Override
-    @Cacheable(value = "latestBlock", ttl = 5)
+    @Cacheable(value = "latestBlock")
     @Retryable(
         value = {Exception.class},
         maxAttempts = 3,
@@ -149,39 +161,74 @@ public class Web3jService implements IWeb3jService {
         maxAttempts = 3,
         backoff = @Backoff(delay = 1000)
     )
-    public Transaction getTransactionByHash(String transactionHash) {
+    public org.web3j.protocol.core.methods.response.Transaction getTransactionByHash(String transactionHash) {
         try {
-            return web3j.ethGetTransactionByHash(transactionHash).send();
+            EthTransaction ethTransaction = web3j.ethGetTransactionByHash(transactionHash).send();
+            return ethTransaction.getTransaction().orElseThrow(() ->
+                new Web3jException("Transaction not found: " + transactionHash));
         } catch (Exception e) {
             log.error("Failed to get transaction by hash: {}", transactionHash, e);
-            throw new RuntimeException("Failed to get transaction by hash", e);
+            throw new Web3jException("Failed to get transaction by hash", e);
         }
     }
 
     @Override
-    @Async
-    public CompletableFuture<List<Transaction>> getPendingTransactionsAsync() {
-        return CompletableFuture.completedFuture(getPendingTransactions());
-    }
-
-    @Override
+    @Cacheable(value = "nodeSync")
     @Retryable(
         value = {Exception.class},
         maxAttempts = 3,
         backoff = @Backoff(delay = 1000)
     )
-    public List<Transaction> getPendingTransactions() {
+    public boolean isNodeSyncing() {
         try {
-            return web3j.ethPendingTransactionHash()
-                .send()
-                .getTransactionHashes()
-                .stream()
-                .map(this::getTransactionByHash)
-                .toList();
+            EthSyncing syncing = web3j.ethSyncing().send();
+            return syncing.isSyncing();
+        } catch (Exception e) {
+            log.error("Failed to check node syncing status", e);
+            throw new RuntimeException("Failed to check node syncing status", e);
+        }
+    }
+
+    @Override
+    @Cacheable(value = "networkId")
+    @Retryable(
+        value = {Exception.class},
+        maxAttempts = 3,
+        backoff = @Backoff(delay = 1000)
+    )
+    public String getNetworkId() {
+        try {
+            EthChainId chainId = web3j.ethChainId().send();
+            return chainId.getChainId().toString();
+        } catch (Exception e) {
+            log.error("Failed to get network ID", e);
+            throw new RuntimeException("Failed to get network ID", e);
+        }
+    }
+
+    @Override
+    public List<org.web3j.protocol.core.methods.response.Transaction> getPendingTransactions() {
+        try {
+            List<org.web3j.protocol.core.methods.response.Transaction> pendingTransactions = new ArrayList<>();
+            EthBlock block = web3j.ethGetBlockByNumber(DefaultBlockParameterName.PENDING, true).send();
+            if (block.getBlock() != null && block.getBlock().getTransactions() != null) {
+                for (EthBlock.TransactionResult<?> tx : block.getBlock().getTransactions()) {
+                    if (tx instanceof EthBlock.TransactionObject) {
+                        pendingTransactions.add(((EthBlock.TransactionObject) tx).get());
+                    }
+                }
+            }
+            return pendingTransactions;
         } catch (Exception e) {
             log.error("Error fetching pending transactions", e);
             throw new Web3jException("Failed to fetch pending transactions", e);
         }
+    }
+
+    @Override
+    @Async
+    public CompletableFuture<List<org.web3j.protocol.core.methods.response.Transaction>> getPendingTransactionsAsync() {
+        return CompletableFuture.completedFuture(getPendingTransactions());
     }
 
     @Override
@@ -200,46 +247,11 @@ public class Web3jService implements IWeb3jService {
                 to,
                 Convert.toWei(amount, Convert.Unit.ETHER).toBigInteger()
             );
-
-            EthEstimateGas gas = web3j.ethEstimateGas(transaction).send();
-            return gas.getAmountUsed();
+            EthEstimateGas estimateGas = web3j.ethEstimateGas(transaction).send();
+            return estimateGas.getAmountUsed();
         } catch (Exception e) {
-            log.error("Error estimating gas for transaction from {} to {}", from, to, e);
+            log.error("Failed to estimate gas", e);
             throw new Web3jException("Failed to estimate gas", e);
-        }
-    }
-
-    @Override
-    @Cacheable(value = "nodeSync", ttl = 30)
-    @Retryable(
-        value = {Exception.class},
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 1000)
-    )
-    public boolean isNodeSyncing() {
-        try {
-            EthSyncing syncing = web3j.ethSyncing().send();
-            return syncing.isSyncing();
-        } catch (Exception e) {
-            log.error("Failed to check node syncing status", e);
-            throw new RuntimeException("Failed to check node syncing status", e);
-        }
-    }
-
-    @Override
-    @Cacheable(value = "networkId", ttl = 3600)
-    @Retryable(
-        value = {Exception.class},
-        maxAttempts = 3,
-        backoff = @Backoff(delay = 1000)
-    )
-    public String getNetworkId() {
-        try {
-            EthChainId chainId = web3j.ethChainId().send();
-            return chainId.getChainId().toString();
-        } catch (Exception e) {
-            log.error("Failed to get network ID", e);
-            throw new RuntimeException("Failed to get network ID", e);
         }
     }
 }

@@ -7,6 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Service;
+import org.web3j.utils.Convert;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -46,6 +47,33 @@ public class Web3MessageConsumer {
                             operation.setResult(Web3Response.success(Map.of(
                                 "gasPrice", gasPrice,
                                 "gasPriceEth", Convert.fromWei(gasPrice.toString(), Convert.Unit.GWEI)
+                            )));
+                        }
+                        case GET_LATEST_BLOCK -> {
+                            BigInteger blockNumber = web3jService.getLatestBlockNumber();
+                            operation.setResult(Web3Response.success(Map.of(
+                                "latestBlockNumber", blockNumber
+                            )));
+                        }
+                        case GET_NETWORK_INFO -> {
+                            operation.setResult(Web3Response.success(Map.of(
+                                "networkId", web3jService.getNetworkId(),
+                                "isSyncing", web3jService.isNodeSyncing(),
+                                "latestBlock", web3jService.getLatestBlockNumber()
+                            )));
+                        }
+                        case ESTIMATE_GAS -> {
+                            String[] params = operation.getAddress().split(",");
+                            BigInteger gasEstimate = web3jService.estimateGas(
+                                params[0], // from
+                                params[1], // to
+                                new BigDecimal(params[2]) // value
+                            );
+                            operation.setResult(Web3Response.success(Map.of(
+                                "from", params[0],
+                                "to", params[1],
+                                "value", params[2],
+                                "gasEstimate", gasEstimate
                             )));
                         }
                         // Add more operation types as needed

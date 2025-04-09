@@ -1,6 +1,6 @@
 package com.example.demo.security;
 
-import com.github.vladimir-bukhtoyarov.bucket4j.core.Bucket;
+import io.github.bucket4j.Bucket;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

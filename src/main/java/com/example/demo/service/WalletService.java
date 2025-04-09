@@ -11,7 +11,6 @@ import org.springframework.amqp.support.AmqpHeaders;
 import org.springframework.messaging.handler.annotation.Header;
 import org.springframework.stereotype.Service;
 import org.web3j.crypto.WalletUtils;
-import org.web3j.utils.Convert;
 
 import java.math.BigDecimal;
 import java.util.Map;
